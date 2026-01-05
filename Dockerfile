@@ -16,7 +16,7 @@ RUN set -eux; \
 
 # Base dependencies: git/python/node/build tools + ffmpeg + supervisor + NapCat runtime libs
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates curl gnupg bash \
+    ca-certificates curl gnupg bash unzip \
     git jq rsync \
     python3 python3-pip python3-dev python3-venv \
     build-essential libffi-dev libssl-dev \
