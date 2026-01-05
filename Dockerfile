@@ -122,13 +122,15 @@ RUN set -eux; \
     chown 1000:1000 /home/user/gotty; \
     rm -f /tmp/gotty.tar.gz
 
+# Download and install Xray-core (proxy forwarder)
 RUN set -eux; \
-    GOST_VERSION=2.11.5; \
-    curl -L -o /tmp/gost.gz "https://github.com/ginuerzh/gost/releases/download/v${GOST_VERSION}/gost-linux-amd64-${GOST_VERSION}.gz" && \
-    gunzip /tmp/gost.gz && \
-    mv /tmp/gost /home/user/gost && \
-    chmod +x /home/user/gost && \
-    chown 1000:1000 /home/user/gost
+    XRAY_VERSION=$(curl -fsSL https://api.github.com/repos/XTLS/Xray-core/releases/latest | jq -r '.tag_name' | sed 's/^v//'); \
+    curl -fL -o /tmp/xray.zip "https://github.com/XTLS/Xray-core/releases/download/v${XRAY_VERSION}/Xray-linux-64.zip" && \
+    unzip -o /tmp/xray.zip -d /tmp/xray && \
+    mv /tmp/xray/xray /home/user/xray && \
+    chmod +x /home/user/xray && \
+    chown 1000:1000 /home/user/xray && \
+    rm -rf /tmp/xray /tmp/xray.zip
 
 # Supervisor and Nginx config + logs
 RUN mkdir -p /home/user/logs && chown -R 1000:1000 /home/user/logs
