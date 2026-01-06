@@ -16,7 +16,7 @@ RUN set -eux; \
 
 # Base dependencies: git/python/node/build tools + ffmpeg + supervisor + NapCat runtime libs
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates curl gnupg bash unzip \
+    ca-certificates curl gnupg bash \
     git jq rsync \
     python3 python3-pip python3-dev python3-venv \
     build-essential libffi-dev libssl-dev \
@@ -122,16 +122,6 @@ RUN set -eux; \
     chown 1000:1000 /home/user/gotty; \
     rm -f /tmp/gotty.tar.gz
 
-# Download and install Xray-core (proxy forwarder)
-RUN set -eux; \
-    XRAY_VERSION=$(curl -fsSL https://api.github.com/repos/XTLS/Xray-core/releases/latest | jq -r '.tag_name' | sed 's/^v//'); \
-    curl -fL -o /tmp/xray.zip "https://github.com/XTLS/Xray-core/releases/download/v${XRAY_VERSION}/Xray-linux-64.zip" && \
-    unzip -o /tmp/xray.zip -d /tmp/xray && \
-    mv /tmp/xray/xray /home/user/xray && \
-    chmod +x /home/user/xray && \
-    chown 1000:1000 /home/user/xray && \
-    rm -rf /tmp/xray /tmp/xray.zip
-
 # Supervisor and Nginx config + logs
 RUN mkdir -p /home/user/logs && chown -R 1000:1000 /home/user/logs
 COPY --chown=1000:1000 supervisor/supervisord.conf /home/user/supervisord.conf
@@ -165,13 +155,6 @@ RUN chmod +x /home/user/scripts/wait-for-sync.sh
 ENV DISPLAY=:1 \
     LIBGL_ALWAYS_SOFTWARE=1 \
     NAPCAT_FLAGS=""
-
-# Optional: SOCKS5 proxy for NapCat (QQ login)
-# Set these to enable proxy: PROXY_SOCKS5_HOST, PROXY_SOCKS5_PORT, PROXY_SOCKS5_USER, PROXY_SOCKS5_PASS
-ENV PROXY_SOCKS5_HOST="" \
-    PROXY_SOCKS5_PORT="" \
-    PROXY_SOCKS5_USER="" \
-    PROXY_SOCKS5_PASS=""
 
 # Optional: admin token for updating routes at runtime (used by Lua)
 ENV ROUTE_ADMIN_TOKEN=""
