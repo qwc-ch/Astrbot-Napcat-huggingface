@@ -145,9 +145,11 @@ RUN chown -R 1000:1000 /home/user/sync
 RUN mkdir -p /app/.config/QQ /app/napcat/config && chown -R 1000:1000 /app
 RUN mkdir -p /home/user/scripts && chown -R 1000:1000 /home/user/scripts
 COPY --chown=1000:1000 scripts/run-napcat.sh /home/user/scripts/run-napcat.sh
+COPY --chown=1000:1000 scripts/run-sin-proxy.sh /home/user/scripts/run-sin-proxy.sh
 COPY --chown=1000:1000 scripts/wait-sync-ready.sh /home/user/scripts/wait-sync-ready.sh
 COPY --chown=1000:1000 scripts/wait-for-sync.sh /home/user/scripts/wait-for-sync.sh
 RUN chmod +x /home/user/scripts/run-napcat.sh
+RUN chmod +x /home/user/scripts/run-sin-proxy.sh
 RUN chmod +x /home/user/scripts/wait-sync-ready.sh
 RUN chmod +x /home/user/scripts/wait-for-sync.sh
 
