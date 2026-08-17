@@ -353,7 +353,14 @@ class SyncDaemon:
         
         # 写入初始进度
         self.write_progress({"stage": "starting", "progress": 0})
-        
+
+        # 0) 未配置备份仓库时跳过 Git 同步，立即放行其他服务
+        if not self.st.github_repo or not self.st.github_pat:
+            log("GITHUB_REPO/GITHUB_PAT 未配置，跳过数据同步（数据不会持久化备份）")
+            self.write_progress({"stage": "skipped", "progress": 100})
+            self.mark_sync_complete()
+            return 0
+
         # 1) 远端准备并对齐（Git 同步）
         log("Stage 1/4: Git repository sync...")
         self.write_progress({"stage": "git", "progress": 10})
