@@ -1,5 +1,3 @@
-<!-- 默认中文文档。English version: README_EN.md -->
-
 ---
 title: AstrBot + NapCat
 emoji: 🤖
@@ -8,6 +6,8 @@ colorTo: purple
 sdk: docker
 pinned: false
 ---
+
+<!-- 默认中文文档。English version: README_EN.md -->
 
 # AstrBot + NapCat 在 Hugging Face 的部署与使用指南
 
