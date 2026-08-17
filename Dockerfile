@@ -1,4 +1,4 @@
-FROM ubuntu:latest
+FROM ubuntu:24.04
 
 # Default APT mirror tuned for GitHub Actions（北美）：azure.archive
 # 可按需覆盖：edge.kernel.org、mirror.rackspace.com 等
