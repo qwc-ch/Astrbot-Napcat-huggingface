@@ -1,5 +1,14 @@
 <!-- 默认中文文档。English version: README_EN.md -->
 
+---
+title: AstrBot + NapCat
+emoji: 🤖
+colorFrom: blue
+colorTo: purple
+sdk: docker
+pinned: false
+---
+
 # AstrBot + NapCat 在 Hugging Face 的部署与使用指南
 
 本仓库将 AstrBot（智能体聊天机器人）与 NapCat（QQ/OneBot 桥接）打包到一个 OpenResty 网关（nginx + Lua）下，适配本地与 Hugging Face Spaces（Docker SDK）。通过 `supervisord` 管理多进程。
