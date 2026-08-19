@@ -66,7 +66,8 @@ DEFAULT_LFS_MAX_WORKERS = int(os.environ.get("LFS_MAX_WORKERS", "3"))  # 并发�
 # LFS 后端：github（GitHub Release asset，默认）或 hf（Hugging Face 仓库）
 DEFAULT_LFS_BACKEND = os.environ.get("LFS_BACKEND", "github").strip().lower()
 DEFAULT_HF_REPO = os.environ.get("HF_REPO", "")  # 仓库 ID：owner/name
-DEFAULT_HF_TOKEN = os.environ.get("HF_TOKEN", "")  # 写 Token（HF Spaces 通常已注入）
+# 写 token 优先用 HF_WRITE_TOKEN（避免与 HF Spaces 自动注入的只读 HF_TOKEN 冲突）
+DEFAULT_HF_TOKEN = os.environ.get("HF_WRITE_TOKEN") or os.environ.get("HF_TOKEN", "")  # 写 Token（HF Spaces 通常已注入）
 DEFAULT_HF_REVISION = os.environ.get("HF_REVISION", "main")
 DEFAULT_HF_REPO_TYPE = os.environ.get("HF_REPO_TYPE", "model").strip().lower()  # model 或 dataset
 DEFAULT_HF_LFS_PREFIX = os.environ.get("HF_LFS_PREFIX", "lfs")  # 文件存放子目录

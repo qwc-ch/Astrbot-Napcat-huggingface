@@ -310,7 +310,12 @@ class SyncDaemon:
         """
         with self._lock:
             # 1. 尝试变基拉取以避免分叉
-            git_ops.run(["git", "pull", "--rebase", "origin", self.st.branch], cwd=self.st.hist_dir, check=False)
+            pull_proc = git_ops.run(
+                ["git", "pull", "--rebase", "origin", self.st.branch],
+                cwd=self.st.hist_dir, check=False
+            )
+            if pull_proc.returncode != 0:
+                err(f"git pull 失败: {(pull_proc.stderr or '').strip()[:600]}")
             
             # 修正文件权限：确保所有文件都可被非 root 进程访问
             try:
@@ -367,12 +372,14 @@ class SyncDaemon:
                 if changed:
                     log("ENABLE_GIT_PUSH=false：仅本地提交，跳过推送")
             else:
-                try:
-                    git_ops.run(["git", "push", "origin", self.st.branch], cwd=self.st.hist_dir, check=False)
-                    if changed:
-                        log("已提交并推送变更")
-                except Exception as e:
-                    err(f"推送失败：{e}")
+                push_proc = git_ops.run(
+                    ["git", "push", "origin", self.st.branch],
+                    cwd=self.st.hist_dir, check=False
+                )
+                if push_proc.returncode != 0:
+                    err(f"git push 失败: {(push_proc.stderr or '').strip()[:600]}")
+                elif changed:
+                    log("已提交并推送变更")
         self._last_commit_ts = time.time()
 
     # -------- 主循环 --------
