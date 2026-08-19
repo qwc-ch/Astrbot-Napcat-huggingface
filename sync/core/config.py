@@ -63,6 +63,14 @@ DEFAULT_LFS_RELEASE_TAG = os.environ.get("LFS_RELEASE_TAG", "large-files-v1")
 DEFAULT_LFS_MAX_VERSIONS = int(os.environ.get("LFS_MAX_VERSIONS", "3"))  # 每个文件最多保留 3 个版本
 DEFAULT_LFS_MAX_WORKERS = int(os.environ.get("LFS_MAX_WORKERS", "3"))  # 并发下载/上传数
 
+# LFS 后端：github（GitHub Release asset，默认）或 hf（Hugging Face 仓库）
+DEFAULT_LFS_BACKEND = os.environ.get("LFS_BACKEND", "github").strip().lower()
+DEFAULT_HF_REPO = os.environ.get("HF_REPO", "")  # 仓库 ID：owner/name
+DEFAULT_HF_TOKEN = os.environ.get("HF_TOKEN", "")  # 写 Token（HF Spaces 通常已注入）
+DEFAULT_HF_REVISION = os.environ.get("HF_REVISION", "main")
+DEFAULT_HF_REPO_TYPE = os.environ.get("HF_REPO_TYPE", "model").strip().lower()  # model 或 dataset
+DEFAULT_HF_LFS_PREFIX = os.environ.get("HF_LFS_PREFIX", "lfs")  # 文件存放子目录
+
 
 @dataclass
 class Settings:
@@ -80,6 +88,13 @@ class Settings:
     lfs_release_tag: str
     lfs_max_versions: int
     lfs_max_workers: int
+    # LFS 后端选择（github | hf）
+    lfs_backend: str
+    hf_repo: str
+    hf_token: str
+    hf_revision: str
+    hf_repo_type: str
+    hf_lfs_prefix: str
     sync_complete_file: str  # 同步完成标记文件
     sync_progress_file: str  # 同步进度文件
 
@@ -158,6 +173,14 @@ def load_settings() -> Settings:
     lfs_release_tag = DEFAULT_LFS_RELEASE_TAG
     lfs_max_versions = DEFAULT_LFS_MAX_VERSIONS
     lfs_max_workers = DEFAULT_LFS_MAX_WORKERS
+
+    # LFS 后端
+    lfs_backend = DEFAULT_LFS_BACKEND if DEFAULT_LFS_BACKEND in ("github", "hf") else "github"
+    hf_repo = DEFAULT_HF_REPO
+    hf_token = DEFAULT_HF_TOKEN
+    hf_revision = DEFAULT_HF_REVISION
+    hf_repo_type = DEFAULT_HF_REPO_TYPE if DEFAULT_HF_REPO_TYPE in ("model", "dataset") else "model"
+    hf_lfs_prefix = DEFAULT_HF_LFS_PREFIX
     
     sync_complete_file = os.path.join(hist_dir, ".sync-complete")
     sync_progress_file = os.path.join(hist_dir, ".sync-progress.json")
@@ -176,6 +199,12 @@ def load_settings() -> Settings:
         lfs_release_tag=lfs_release_tag,
         lfs_max_versions=lfs_max_versions,
         lfs_max_workers=lfs_max_workers,
+        lfs_backend=lfs_backend,
+        hf_repo=hf_repo,
+        hf_token=hf_token,
+        hf_revision=hf_revision,
+        hf_repo_type=hf_repo_type,
+        hf_lfs_prefix=hf_lfs_prefix,
         sync_complete_file=sync_complete_file,
         sync_progress_file=sync_progress_file,
     )

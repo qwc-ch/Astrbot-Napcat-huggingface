@@ -273,6 +273,8 @@ def create_app(daemon=None):
         st = load_settings()
         return {
             "enabled": st.lfs_enabled,
+            "backend": st.lfs_backend,
+            "hf_repo": st.hf_repo if st.lfs_backend == "hf" else "",
             "threshold": st.lfs_threshold,
             "release_tag": st.lfs_release_tag,
             "max_versions": st.lfs_max_versions,

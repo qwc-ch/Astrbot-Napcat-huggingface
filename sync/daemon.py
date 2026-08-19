@@ -67,13 +67,27 @@ class SyncDaemon:
         self._last_commit_ts: float = 0.0
         
         # LFS 支持
-        self._lfs_api: Optional[GitHubReleaseAPI] = None
+        self._lfs_api: Optional[object] = None
         self._lfs_manifest: Optional[Manifest] = None
         if self.st.lfs_enabled and LFS_AVAILABLE:
             try:
-                self._lfs_api = GitHubReleaseAPI(self.st.github_repo, self.st.github_pat)
+                if self.st.lfs_backend == "hf":
+                    from sync.core.hf_api import HuggingFaceHubAPI
+
+                    if not self.st.hf_repo or not self.st.hf_token:
+                        raise RuntimeError("HF_REPO/HF_TOKEN 未配置，无法使用 HF LFS 后端")
+                    self._lfs_api = HuggingFaceHubAPI(
+                        repo=self.st.hf_repo,
+                        token=self.st.hf_token,
+                        revision=self.st.hf_revision,
+                        repo_type=self.st.hf_repo_type,
+                        prefix=self.st.hf_lfs_prefix,
+                    )
+                    log(f"LFS enabled (backend=huggingface, repo={self.st.hf_repo})")
+                else:
+                    self._lfs_api = GitHubReleaseAPI(self.st.github_repo, self.st.github_pat)
+                    log("LFS enabled (backend=github)")
                 self._lfs_manifest = Manifest(self.st.hist_dir, self.st.lfs_release_tag)
-                log("LFS enabled")
             except Exception as e:
                 err(f"Failed to initialize LFS: {e}")
                 self._lfs_api = None
