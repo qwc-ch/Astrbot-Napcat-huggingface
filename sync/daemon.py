@@ -280,17 +280,19 @@ class SyncDaemon:
             log("Cleaning up old LFS versions...")
             to_delete = self._lfs_manifest.cleanup_all_old_versions(keep=self.st.lfs_max_versions)
             
-            # 从 Release 删除旧版本的 assets
+            # 从仓库删除旧版本的 LFS 条目（对象存储内容寻址，删条目即可）
             if to_delete:
-                release = self._lfs_api.get_or_create_release(self.st.lfs_release_tag)
                 for file_path, asset_names in to_delete.items():
                     for asset_name in asset_names:
-                        try:
-                            asset = self._lfs_api.get_asset_by_name(release, asset_name)
-                            if asset:
-                                self._lfs_api.delete_asset(asset)
-                        except Exception as e:
-                            err(f"Failed to delete old asset {asset_name}: {e}")
+                        lpath = os.path.join(
+                            self.st.hist_dir, "lfs", self.st.lfs_release_tag, asset_name
+                        )
+                        if os.path.exists(lpath):
+                            try:
+                                os.remove(lpath)
+                                log(f"Removed old LFS entry: lfs/{self.st.lfs_release_tag}/{asset_name}")
+                            except OSError as e:
+                                err(f"Failed to remove old LFS entry {asset_name}: {e}")
             
             # 保存 manifest
             self._lfs_manifest.save()
@@ -314,6 +316,20 @@ class SyncDaemon:
                 subprocess.run(["chmod", "-R", "777", "/home/user"], check=False)
             except Exception as e:
                 err(f"修正权限失败: {e}")
+
+            # 0.5 预排除二进制/大文件：确保它们永远不进入 git 提交，
+            #     避免 pull --rebase 时被 git 当作"已删除"而物理删除运行中的文件
+            if self.st.lfs_enabled:
+                from sync.core.lfs_ops import scan_large_files
+                from sync.core.blacklist import ensure_git_info_exclude
+                files = scan_large_files(
+                    self.st.hist_dir, self.st.lfs_threshold, self.st.excludes
+                )
+                if files:
+                    ensure_git_info_exclude(
+                        self.st.hist_dir,
+                        [os.path.relpath(f, self.st.hist_dir) for f in files],
+                    )
 
             # 1. 先提交本地变更，保证工作区干净再 pull（应用会持续写文件）
             git_ops.add_all_and_commit_if_needed(

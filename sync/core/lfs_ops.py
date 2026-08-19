@@ -171,6 +171,22 @@ def convert_to_lfs(
         
         pointer_path = file_path + ".pointer"
         write_pointer(pointer_path, pointer)
+
+        # 5.1 写标准 git-lfs 指针条目（供远端 resolve 使用；随周期 git 提交推送，
+        #     不再依赖 HF REST commit API，避免与 git push 并发抢分支）
+        try:
+            lfs_root = os.path.join(manifest.hist_dir, "lfs", release_tag)
+            os.makedirs(lfs_root, exist_ok=True)
+            lfs_entry = os.path.join(lfs_root, actual_asset_name)
+            with open(lfs_entry, "w", encoding="utf-8") as f:
+                f.write(
+                    f"version https://git-lfs.github.com/spec/v1\n"
+                    f"oid {file_hash}\n"
+                    f"size {file_size}\n"
+                )
+            log(f"LFS entry written: lfs/{release_tag}/{actual_asset_name}")
+        except OSError as e:
+            err(f"Failed to write LFS entry for {filename}: {e}")
         
         # 6. 从 Git 索引中移除大文件（如果已被追踪）
         from sync.core import git_ops

@@ -328,8 +328,9 @@ class HuggingFaceHubAPI:
                 except (httpx.RequestError, httpx.HTTPStatusError) as e:
                     raise RuntimeError(f"HF 上传校验失败: {e}") from e
 
-        # 4. 通过 commit API 写入指针条目（内容在对象存储，仓库里由指针引用）
-        self._commit_pointer_file(tag, asset_name, oid, file_size)
+        # 4. 不再通过 REST commit API 写入仓库（避免与 git push 并发抢分支）。
+        #    标准 git-lfs 指针条目由 convert_to_lfs 写入本地仓库，
+        #    随周期 git 提交统一推送。
 
         log(f"✓ Uploaded asset: {asset_name}")
         return self._make_asset(asset_name, file_size, tag)
