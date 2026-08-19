@@ -1,95 +1,116 @@
-# AstrBot + NapCat on Hugging Face
+# AstrBot + NapCat on Hugging Face, with full data backup
 
-This repo packages AstrBot (agent chatbot) and NapCat (QQ/OneBot bridge) behind an OpenResty (nginx + Lua) gateway. It targets both local Docker and Hugging Face Spaces (Docker SDK). Processes are orchestrated by `supervisord`.
+Package **AstrBot** (AI chatbot framework) + **NapCat** (QQ / OneBot bridge) into a single Docker image that runs **for free on Hugging Face Spaces**, with a built-in **Git full-data backup** (small files + LFS for large files) so nothing is lost across restarts/rebuilds.
 
-Upstreams:
-- AstrBot: https://github.com/AstrBotDevs/AstrBot
-- NapCat AppImage Build: https://github.com/NapNeko/NapCatAppImageBuild
+No server, no ICP filing — the CPU Basic free tier is enough.
 
-Components and ports:
-- AstrBot (Python 3.10+): 6185 (proxied)
-- NapCat (AppImage + Xvfb): 6099/3001/6199 (proxied)
-- OpenResty gateway: 7860 (public)
+## Features
 
-Default routes (on 7860):
-- `/` → AstrBot dashboard (default backend `http://127.0.0.1:6185`)
-- `/webui/`, `/api/ws/` → NapCat (`http://127.0.0.1:6099`)
-- `/admin/ui/` → Router admin UI (header `X-Admin-Password`, default `admin`)
+- 🚀 **One-click deploy**: just push to an HF Space (Docker SDK)
+- 🤖 **AstrBot v4.x**: visual dashboard to configure models (OpenAI / Claude / Gemini / local Ollama, etc.) and plugins
+- 💬 **NapCat QQ**: QR-code login through the OneBot11 protocol
+- 💾 **Full data backup**: config, sessions, QQ login state are committed & pushed every 3 minutes (large files via LFS)
+- 🔀 **Git / HF dual remotes**: point your backup at GitHub or Hugging Face (`GIT_BACKEND` toggles)
+- 🔐 **OpenResty gateway**: Lua dynamic routing, single port (7860)
+- 🛠 **Runtime toggles**: `config.env` controls NapCat / Git push / LFS push — edit a line, push, done
 
-Layout:
-- `Dockerfile` — build all deps and clone upstream apps
-- `supervisor/supervisord.conf` — nginx, Xvfb, Sync, NapCat, AstrBot
-- `nginx/nginx.conf` — OpenResty dynamic routing and admin API
-- `scripts/` — NapCat launcher script
+## Architecture & ports
 
----
+| Component | Port | Notes |
+| --- | --- | --- |
+| OpenResty gateway | 7860 (public) | single entry point |
+| AstrBot | 6185 | chatbot + WebUI |
+| NapCat | 6099 | QQ / OneBot bridge (WebUI) |
+| sync daemon | - | periodic pull → commit → push + LFS upload |
+| FileBrowser | 8888 | container file manager (via `/filebrowser/`) |
 
-## Environment Variables (Tables)
+Default routes (editable at `/admin/ui/`):
+- `/` → AstrBot dashboard
+- `/webui/`, `/api/ws/` → NapCat
+- `/admin/ui/` → Router admin UI (default password `admin`)
 
-NapCat (optional)
+## Quick start (Hugging Face Spaces)
 
-| Name | Required | Default | Example | Notes |
-| --- | --- | --- | --- | --- |
-| `NAPCAT_FLAGS` | No | empty | `--disable-gpu` | Extra flags passed to the QQ AppImage. Non‑root run usually doesn't require `--no-sandbox`. |
-| `TZ` | No | `Asia/Shanghai` | `Asia/Shanghai` | Timezone. |
+1. Create a Space on huggingface.co: SDK **Docker** (Private recommended)
+2. Push this repo to it (Space auto-builds on push)
+3. **Required secrets** (Settings → Variables and secrets):
+   - `HF_REPO`: your backup repo ID (e.g. `yourname/astrbot-backup`; create an empty model repo on HF first)
+   - `HF_TOKEN`: write-capable HF token (huggingface.co/settings/tokens, `write` role)
+4. **Optional** — if backing up to GitHub instead:
+   - `GITHUB_REPO`: `yourname/astrbot-backup`
+   - `GITHUB_PAT`: GitHub token (`repo` scope)
+5. After the build, visit the Space URL:
+   - `/` → AstrBot WebUI (first-run logs show initial username `astrbot` + one-time password)
+   - `/webui/` → NapCat panel, scan QR to log in to QQ
+   - `/admin/ui/` → change the router admin password (default `admin`)
 
----
+> With no backup repo configured, the sync daemon safely skips persistence.
 
-## Local Quick Start (Docker)
-1) Build:
-```
+## Quick start (local Docker)
+
+```bash
 docker build -t astrbot-napcat-hf:latest .
+docker run -d -p 7860:7860 --name astrbot-napcat astrbot-napcat-hf:latest
 ```
-2) Run (replace examples as needed):
-```
-docker run -d \
-  -p 7860:7860 \
-  --name astrbot-napcat astrbot-napcat-hf:latest
-```
-3) Open `http://localhost:7860/`:
-- `/` AstrBot dashboard (first boot downloads UI assets)
-- `/webui/` NapCat UI (login/QR)
-- `/admin/ui/` Router admin UI (`admin` default)
 
----
+Open `http://localhost:7860/`.
 
-## Hugging Face (Docker SDK)
-1) Create a Space (Docker SDK). Private is recommended for privacy.
-2) Push this repo to the Space or connect via GitHub.
-3) Configure Settings → Variables and secrets:
-- Optional: `NAPCAT_FLAGS` (e.g. `--disable-gpu`).
-4) Hardware: CPU Basic is enough; disable Sleep to keep bots online.
-5) Start the Space; wait for build, then open the Space URL (listens on 7860).
-6) First‑time:
-- Visit `/admin/ui/` and change the admin password.
-- Configure AstrBot providers/platforms.
-- Login/bind NapCat via `/webui/`.
+## Runtime toggles (config.env)
 
----
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `ENABLE_NAPCAT` | `true` | set `false` to run AstrBot only |
+| `GIT_BACKEND` | `github` | backup metadata remote: `github` or `hf` |
+| `GIT_HF_REPO` | same as `HF_REPO` | metadata repo when `GIT_BACKEND=hf` |
+| `ENABLE_GIT_PUSH` | `true` | push to remote git repo (off = data stays in container) |
+| `ENABLE_HF_PUSH` | `true` | scan & upload large files to LFS |
 
-## Router Admin API Cheatsheet
-- Get routes:
+## Backup mechanism
+
+- On boot: pull → align → migrate data dirs to symlinks → restore LFS files
+- Runtime: every 3 minutes (`SYNC_INTERVAL`) `git pull --rebase` → commit → push
+- Large files (default > 60MB, `LFS_THRESHOLD`) go through LFS: GitHub Release assets or HF LFS (git-lfs batch protocol)
+- Default targets (`SYNC_TARGETS`):
+  - `home/user/AstrBot/data/`, `home/user/config/`
+  - `app/napcat/config/`, `app/.config/QQ/`
+  - `home/user/nginx/admin_config.json`, `home/user/filebrowser-data/filebrowser.db`
+
+## Layout
+
 ```
-curl -H "X-Admin-Password: <pass>" https://<host>/admin/routes.json
+├── Dockerfile                  # builds all deps & runtime
+├── config.env                  # runtime toggles (NapCat / Git push / LFS push)
+├── supervisor/supervisord.conf # nginx, Xvfb, sync, NapCat, AstrBot
+├── nginx/                      # OpenResty dynamic routing + admin API
+├── scripts/                    # service launchers
+├── sync/                       # backup daemon (Git + LFS, GitHub / HF backends)
+│   └── web/                    # sync status Web UI
+└── docs/add-process.md         # how to add new services
 ```
-- Replace routes:
-```
-curl -X POST -H "X-Admin-Password: <pass>" -H "Content-Type: application/json" \
+
+## Router admin API
+
+```bash
+curl -H "X-Admin-Password: admin" https://<host>/admin/routes.json
+curl -X POST -H "X-Admin-Password: admin" -H "Content-Type: application/json" \
   -d '{"default_backend":"http://127.0.0.1:6185","rules":[...]}' \
   https://<host>/admin/routes.json
-```
-- Change password:
-```
 curl -X POST -H "X-Admin-Password: <old>" -H "Content-Type: application/json" \
   -d '{"new_password":"<new>"}' https://<host>/admin/password
 ```
 
 ## Troubleshooting
-- 502/blank: check `/admin/ui/`; ensure default backend is `http://127.0.0.1:6185`.
-- NapCat issues: AppImage runs with `--appimage-extract-and-run` under Xvfb; consider `--disable-gpu`.
-- First AstrBot boot slow: downloads dashboard assets; wait a moment.
 
----
+- **502 / blank page**: check `/admin/ui/`, ensure default backend is `http://127.0.0.1:6185`
+- **NapCat exits immediately**: `--no-sandbox` is already set for non-root; try `NAPCAT_FLAGS=--disable-gpu`
+- **Slow HF build**: apt mirror defaults to `mirror.netcologne.de`; override with `APT_MIRROR`
+- **Empty backup repo**: confirm `HF_REPO` + `HF_TOKEN` (or `GITHUB_REPO` + `GITHUB_PAT`) are set; only files above `LFS_THRESHOLD` go through LFS
+
+## Credits
+
+- [AstrBot](https://github.com/AstrBotDevs/AstrBot)
+- [NapCat](https://github.com/NapNeko/NapCatAppImageBuild)
 
 ## License
-This repo glues upstream projects (each under their own licenses). See upstream repos for details; this repo adds configuration and automation only.
+
+[MIT](./LICENSE). Upstream projects keep their own licenses.

@@ -2,3 +2,9 @@
 
 __pycache__/
 *.pyc
+
+# 运行时数据
+filebrowser.db
+*.db
+.env
+HIST_DIR/
