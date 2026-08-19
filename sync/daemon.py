@@ -414,6 +414,29 @@ class SyncDaemon:
                             err(f"git push 重试仍失败: {retry_proc.stdout or ''}{retry_proc.stderr or ''}")
                         elif retry_proc.returncode == 0:
                             log("已提交并推送变更")
+                    elif any(k in push_output for k in ("fetch first", "non-fast-forward", "Updates were rejected")):
+                        # 上传 LFS 资产期间远端被推进（其 commit 与我们的指针提交共存），拉取后重推
+                        log("远端已更新（LFS 资产提交），重新拉取后重试推送…")
+                        for attempt in range(3):
+                            pull_again = git_ops.run(
+                                ["git", "pull", "--rebase", "origin", self.st.branch],
+                                cwd=self.st.hist_dir, check=False
+                            )
+                            if pull_again.returncode != 0:
+                                err(f"重推前 pull 失败: {(pull_again.stderr or '').strip()[-800:]}")
+                                continue
+                            self.process_large_files()
+                            git_ops.add_all_and_commit_if_needed(
+                                self.st.hist_dir, "chore(sync): rebase commit"
+                            )
+                            retry_proc = git_ops.run(
+                                ["git", "push", "origin", self.st.branch],
+                                cwd=self.st.hist_dir, check=False
+                            )
+                            if retry_proc.returncode == 0:
+                                log("已提交并推送变更（重试成功）")
+                                break
+                            err(f"git push 重试({attempt + 1}/3)仍失败: {retry_proc.stdout or ''}{retry_proc.stderr or ''}")
                 elif changed:
                     log("已提交并推送变更")
         self._last_commit_ts = time.time()
