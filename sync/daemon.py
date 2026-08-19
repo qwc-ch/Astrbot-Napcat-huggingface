@@ -392,7 +392,7 @@ class SyncDaemon:
                     cwd=self.st.hist_dir, check=False
                 )
                 if push_proc.returncode != 0:
-                    err(f"git push 失败: {(push_proc.stderr or '').strip()[-1500:]}")
+                    err(f"git push 失败: {push_proc.stdout or ''}{push_proc.stderr or ''}")
                 elif changed:
                     log("已提交并推送变更")
         self._last_commit_ts = time.time()
