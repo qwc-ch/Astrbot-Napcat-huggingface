@@ -309,21 +309,36 @@ class SyncDaemon:
         - push 失败并不会中断守护，仅记录日志等待下次重试。
         """
         with self._lock:
-            # 1. 尝试变基拉取以避免分叉
+            # 0. 修正文件权限：确保所有文件都可被非 root 进程访问
+            try:
+                subprocess.run(["chmod", "-R", "777", "/home/user"], check=False)
+            except Exception as e:
+                err(f"修正权限失败: {e}")
+
+            # 1. 先提交本地变更，保证工作区干净再 pull（应用会持续写文件）
+            git_ops.add_all_and_commit_if_needed(
+                self.st.hist_dir, "chore(sync): pre-pull commit"
+            )
+
+            # 2. 尝试变基拉取以避免分叉
             pull_proc = git_ops.run(
                 ["git", "pull", "--rebase", "origin", self.st.branch],
                 cwd=self.st.hist_dir, check=False
             )
             if pull_proc.returncode != 0:
-                err(f"git pull 失败: {(pull_proc.stderr or '').strip()[:600]}")
-            
-            # 修正文件权限：确保所有文件都可被非 root 进程访问
-            try:
-                subprocess.run(["chmod", "-R", "777", "/home/user"], check=False)
-            except Exception as e:
-                err(f"修正权限失败: {e}")
-            
-            # 2. 立即恢复 LFS 文件（防止 pull 删除大文件）
+                err(f"git pull 失败: {(pull_proc.stderr or '').strip()[-1500:]}")
+                # 拉取失败（如本地有未提交变更）时，强制 stash 后重试一次
+                git_ops.run(["git", "stash", "push", "-u", "-m", "sync-{}".format(int(time.time()))],
+                            cwd=self.st.hist_dir, check=False)
+                pull_proc = git_ops.run(
+                    ["git", "pull", "--rebase", "origin", self.st.branch],
+                    cwd=self.st.hist_dir, check=False
+                )
+                if pull_proc.returncode != 0:
+                    err(f"git pull 重试仍失败: {(pull_proc.stderr or '').strip()[-1500:]}")
+                git_ops.run(["git", "stash", "pop"], cwd=self.st.hist_dir, check=False)
+
+            # 3. 立即恢复 LFS 文件（防止 pull 删除大文件）
             if self.st.lfs_enabled and self._lfs_api and self._lfs_manifest:
                 try:
                     # 扫描指针文件
@@ -352,7 +367,7 @@ class SyncDaemon:
                 except Exception as e:
                     err(f"Failed to restore LFS files after pull: {e}")
             
-            # 3. 处理大文件（转换为 LFS）
+            # 4. 处理大文件（转换为 LFS）
             if self.st.enable_hf_push:
                 self.process_large_files()
             elif not hasattr(self, "_hf_push_warned"):
@@ -362,12 +377,12 @@ class SyncDaemon:
             # 3. 持续跟踪空目录，确保新建的空文件夹也能被同步
             track_empty_dirs(self.st.hist_dir, self.st.targets, self.st.excludes)
             
-            # 4. 提交变更（包括新的指针文件和 manifest）
+            # 5. 提交变更（包括新的指针文件和 manifest）
             changed = git_ops.add_all_and_commit_if_needed(
                 self.st.hist_dir, "chore(sync): periodic commit"
             )
             
-            # 5. 若有变更或远端领先，尝试推送
+            # 6. 若有变更或远端领先，尝试推送
             if not self.st.enable_git_push:
                 if changed:
                     log("ENABLE_GIT_PUSH=false：仅本地提交，跳过推送")
@@ -377,7 +392,7 @@ class SyncDaemon:
                     cwd=self.st.hist_dir, check=False
                 )
                 if push_proc.returncode != 0:
-                    err(f"git push 失败: {(push_proc.stderr or '').strip()[:600]}")
+                    err(f"git push 失败: {(push_proc.stderr or '').strip()[-1500:]}")
                 elif changed:
                     log("已提交并推送变更")
         self._last_commit_ts = time.time()
@@ -390,9 +405,13 @@ class SyncDaemon:
         # 写入初始进度
         self.write_progress({"stage": "starting", "progress": 0})
 
-        # 0) 未配置备份仓库时跳过 Git 同步，立即放行其他服务
-        if not self.st.github_repo or not self.st.github_pat:
-            log("GITHUB_REPO/GITHUB_PAT 未配置，跳过数据同步（数据不会持久化备份）")
+        # 0) 未配置备份远端时跳过 Git 同步，立即放行其他服务
+        if self.st.git_backend == "hf":
+            has_target = bool(self.st.hf_token and self.st.git_hf_repo)
+        else:
+            has_target = bool(self.st.github_repo and self.st.github_pat)
+        if not has_target:
+            log(f"备份远端未配置（git_backend={self.st.git_backend}），跳过数据同步（数据不会持久化备份）")
             self.write_progress({"stage": "skipped", "progress": 100})
             self.mark_sync_complete()
             return 0
