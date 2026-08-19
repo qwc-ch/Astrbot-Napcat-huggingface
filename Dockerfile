@@ -16,7 +16,7 @@ RUN set -eux; \
     fi
 
 # Base dependencies: git/python/node/build tools + ffmpeg + supervisor + NapCat runtime libs
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=120 -o Acquire::https::Timeout=120 update && apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=120 -o Acquire::https::Timeout=120 install -y --no-install-recommends \
     ca-certificates curl gnupg bash \
     git jq rsync \
     python3 python3-pip python3-dev python3-venv \
@@ -35,18 +35,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
  && rm -rf /var/lib/apt/lists/*
 
 # Node.js LTS (for AstrBot)
-RUN apt-get update && apt-get install -y curl gnupg && \
+RUN apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=120 -o Acquire::https::Timeout=120 update && apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=120 -o Acquire::https::Timeout=120 install -y curl gnupg && \
     curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && \
-    apt-get install -y nodejs && \
+    apt-get -o Acquire::Retries=5 install -y nodejs && \
     rm -rf /var/lib/apt/lists/*
 
 # Install OpenResty (nginx with built-in LuaJIT & ngx_lua)
 RUN set -eux; \
-    apt-get update && apt-get install -y --no-install-recommends ca-certificates curl gnupg lsb-release && \
+    apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=120 update && apt-get -o Acquire::Retries=5 install -y --no-install-recommends ca-certificates curl gnupg lsb-release && \
     curl -fsSL https://openresty.org/package/pubkey.gpg | gpg --dearmor -o /usr/share/keyrings/openresty.gpg && \
     echo "deb [signed-by=/usr/share/keyrings/openresty.gpg] http://openresty.org/package/ubuntu $(lsb_release -sc) main" \
       | tee /etc/apt/sources.list.d/openresty.list > /dev/null && \
-    apt-get update && apt-get install -y --no-install-recommends openresty && \
+    apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=120 update && apt-get -o Acquire::Retries=5 install -y --no-install-recommends openresty && \
     rm -rf /var/lib/apt/lists/*
 
 # Non-root user paths (UID 1000)
