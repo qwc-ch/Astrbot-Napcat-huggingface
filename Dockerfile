@@ -86,22 +86,26 @@ ENV TZ=Asia/Shanghai
 
 
 # NapCat AppImage: download latest release, extract and keep extracted tree
-RUN LATEST_URL=$(curl -sL https://api.github.com/repos/NapNeko/NapCatAppImageBuild/releases/latest | \
-    jq -r '.assets[] | select(.name | endswith("-amd64.AppImage")) | .browser_download_url' | head -1) && \
-    curl -L -o /home/user/QQ.AppImage "$LATEST_URL" && \
-    chown 1000:1000 /home/user/QQ.AppImage && \
-    chmod +x /home/user/QQ.AppImage && \
-    /home/user/QQ.AppImage --appimage-extract && \
-    mv squashfs-root /home/user/napcat && \
+# HF 构建机访问 api.github.com 常被限流，API 失败时回退固定版本直链
+RUN set -eux; \
+    api_json="$(curl -fsSL --retry 3 https://api.github.com/repos/NapNeko/NapCatAppImageBuild/releases/latest 2>/dev/null || true)"; \
+    LATEST_URL="$(printf '%s' "${api_json}" | jq -r '.assets[] | select(.name | endswith("-amd64.AppImage")) | .browser_download_url' 2>/dev/null | head -n1 | tr -d '\r')"; \
+    test -n "${LATEST_URL}" || LATEST_URL="https://github.com/NapNeko/NapCatAppImageBuild/releases/download/v4.18.19/QQ-50969_NapCat-v4.18.19-amd64.AppImage"; \
+    test -n "${LATEST_URL}"; \
+    curl -fL --retry 3 -o /home/user/QQ.AppImage "${LATEST_URL}"; \
+    chown 1000:1000 /home/user/QQ.AppImage; \
+    chmod +x /home/user/QQ.AppImage; \
+    /home/user/QQ.AppImage --appimage-extract; \
+    mv squashfs-root /home/user/napcat; \
     chown -R 1000:1000 /home/user/napcat
 
 # Download and install FileBrowser
 RUN set -eux; \
-    LATEST_URL="$(curl -fsSL https://api.github.com/repos/filebrowser/filebrowser/releases/latest | \
-      jq -r '.assets[] | select(.name | contains("linux-amd64-filebrowser.tar.gz")) | .browser_download_url' | \
-      head -n 1 | tr -d '\r')"; \
+    api_json="$(curl -fsSL --retry 3 https://api.github.com/repos/filebrowser/filebrowser/releases/latest 2>/dev/null || true)"; \
+    LATEST_URL="$(printf '%s' "${api_json}" | jq -r '.assets[] | select(.name | contains("linux-amd64-filebrowser.tar.gz")) | .browser_download_url' 2>/dev/null | head -n1 | tr -d '\r')"; \
+    test -n "${LATEST_URL}" || LATEST_URL="https://github.com/filebrowser/filebrowser/releases/download/v2.63.23/linux-amd64-filebrowser.tar.gz"; \
     test -n "${LATEST_URL}"; \
-    curl -fL -o /tmp/filebrowser.tar.gz "${LATEST_URL}"; \
+    curl -fL --retry 3 -o /tmp/filebrowser.tar.gz "${LATEST_URL}"; \
     tar -xzf /tmp/filebrowser.tar.gz -C /tmp; \
     mv /tmp/filebrowser /home/user/filebrowser; \
     chmod +x /home/user/filebrowser; \
