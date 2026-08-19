@@ -43,7 +43,7 @@ DEFAULT_TARGETS = (
 DEFAULT_EXCLUDES = (
     os.environ.get(
         "EXCLUDE_PATHS",
-        "home/user/AstrBot/data/plugin_data/jm_cosmos home/user/AstrBot/data/memes_data",
+        "home/user/AstrBot/data/plugin_data/jm_cosmos home/user/AstrBot/data/memes_data home/user/AstrBot/data/dist",
     )
     .strip()
     .split()

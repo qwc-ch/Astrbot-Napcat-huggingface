@@ -261,7 +261,7 @@ class SyncDaemon:
             if not large_files:
                 return
             
-            log(f"Found {len(large_files)} large files (>{self.st.lfs_threshold} bytes)")
+            log(f"Found {len(large_files)} large/binary files (>{self.st.lfs_threshold} bytes or binary)")
             
             # 逐个转换为 LFS
             for file_path in large_files:
@@ -377,12 +377,15 @@ class SyncDaemon:
             # 3. 持续跟踪空目录，确保新建的空文件夹也能被同步
             track_empty_dirs(self.st.hist_dir, self.st.targets, self.st.excludes)
             
-            # 5. 提交变更（包括新的指针文件和 manifest）
+            # 5. 提交前二次转换：捕捉本周期新增的二进制/大文件，避免原始文件进入 Git
+            self.process_large_files()
+
+            # 6. 提交变更（包括新的指针文件和 manifest）
             changed = git_ops.add_all_and_commit_if_needed(
                 self.st.hist_dir, "chore(sync): periodic commit"
             )
             
-            # 6. 若有变更或远端领先，尝试推送
+            # 7. 若有变更或远端领先，尝试推送
             if not self.st.enable_git_push:
                 if changed:
                     log("ENABLE_GIT_PUSH=false：仅本地提交，跳过推送")
@@ -392,7 +395,25 @@ class SyncDaemon:
                     cwd=self.st.hist_dir, check=False
                 )
                 if push_proc.returncode != 0:
-                    err(f"git push 失败: {push_proc.stdout or ''}{push_proc.stderr or ''}")
+                    push_output = f"{push_proc.stdout or ''}{push_proc.stderr or ''}"
+                    err(f"git push 失败: {push_output}")
+                    if "binary files" in push_output or "contains binary" in push_output:
+                        # 远端拒收原始二进制：重置本地历史到远端并重新转换后重试一次
+                        log("远端拒收二进制文件，重置本地历史并重新转换后重试…")
+                        git_ops.run(["git", "reset", "--mixed", "origin/main"],
+                                    cwd=self.st.hist_dir, check=False)
+                        self.process_large_files()
+                        git_ops.add_all_and_commit_if_needed(
+                            self.st.hist_dir, "chore(sync): purge raw binaries"
+                        )
+                        retry_proc = git_ops.run(
+                            ["git", "push", "origin", self.st.branch],
+                            cwd=self.st.hist_dir, check=False
+                        )
+                        if retry_proc.returncode != 0:
+                            err(f"git push 重试仍失败: {retry_proc.stdout or ''}{retry_proc.stderr or ''}")
+                        elif retry_proc.returncode == 0:
+                            log("已提交并推送变更")
                 elif changed:
                     log("已提交并推送变更")
         self._last_commit_ts = time.time()

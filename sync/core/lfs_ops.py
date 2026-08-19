@@ -62,22 +62,39 @@ def calculate_file_hash(file_path: str, algorithm: str = "sha256") -> str:
     return f"{algorithm}:{hasher.hexdigest()}"
 
 
+def is_binary_file(file_path: str, sample_size: int = 8192) -> bool:
+    """通过内容嗅探判断文件是否为二进制（文本检测失败即视为二进制）"""
+    try:
+        with open(file_path, 'rb') as f:
+            sample = f.read(sample_size)
+        if not sample:
+            return False
+        if b'\x00' in sample:
+            return True
+        text_chars = bytes(range(0x20, 0x7f)) + b'\t\n\r\x0b\x0c'
+        return bool(sample.translate(None, text_chars))
+    except OSError:
+        return False
+
+
 def should_use_lfs(file_path: str, threshold: int) -> bool:
     """判断文件是否应该使用 LFS
-    
+
     Args:
         file_path: 文件路径
         threshold: 大小阈值（字节）
-    
+
     Returns:
-        如果文件存在且大小超过阈值，返回 True
+        文件为二进制（任意大小）或超过大小阈值时返回 True
     """
     if not os.path.isfile(file_path):
         return False
     
     try:
         size = os.path.getsize(file_path)
-        return size > threshold
+        return size > threshold or is_binary_file(file_path)
+    except OSError:
+        return False
     except OSError:
         return False
 
