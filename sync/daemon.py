@@ -95,6 +95,9 @@ class SyncDaemon:
 
     # -------- 核心阶段：准备远端并对齐 HEAD --------
     def _remote_url(self) -> str:
+        """git 远端：GIT_BACKEND=hf 时全部数据走 HF 仓库；否则 GitHub。"""
+        if self.st.git_backend == "hf":
+            return f"https://x-access-token:{self.st.hf_token}@huggingface.co/{self.st.git_hf_repo}.git"
         return f"https://x-access-token:{self.st.github_pat}@github.com/{self.st.github_repo}.git"
 
     def ensure_remote_ready(self) -> None:

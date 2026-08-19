@@ -75,6 +75,11 @@ DEFAULT_HF_LFS_PREFIX = os.environ.get("HF_LFS_PREFIX", "lfs")  # 文件存放�
 DEFAULT_ENABLE_GIT_PUSH = os.environ.get("ENABLE_GIT_PUSH", "true").lower() == "true"
 DEFAULT_ENABLE_HF_PUSH = os.environ.get("ENABLE_HF_PUSH", "true").lower() == "true"
 
+# git 元数据远端：github（GitHub 仓库，默认）或 hf（HF 仓库，所有数据都在 HF）
+DEFAULT_GIT_BACKEND = os.environ.get("GIT_BACKEND", "github").strip().lower()
+# 元数据仓库（仅 GIT_BACKEND=hf 时使用；默认与 HF_REPO 相同）
+DEFAULT_GIT_HF_REPO = os.environ.get("GIT_HF_REPO", "")
+
 
 @dataclass
 class Settings:
@@ -102,6 +107,9 @@ class Settings:
     # 运行开关（config.env）
     enable_git_push: bool
     enable_hf_push: bool
+    # git 远端选择（github | hf）
+    git_backend: str
+    git_hf_repo: str
     sync_complete_file: str  # 同步完成标记文件
     sync_progress_file: str  # 同步进度文件
 
@@ -192,6 +200,10 @@ def load_settings() -> Settings:
     # 运行开关（config.env）
     enable_git_push = DEFAULT_ENABLE_GIT_PUSH
     enable_hf_push = DEFAULT_ENABLE_HF_PUSH
+
+    # git 远端选择（config.env：GIT_BACKEND=hf 时全部数据走 HF）
+    git_backend = DEFAULT_GIT_BACKEND if DEFAULT_GIT_BACKEND in ("github", "hf") else "github"
+    git_hf_repo = DEFAULT_GIT_HF_REPO or DEFAULT_HF_REPO
     
     sync_complete_file = os.path.join(hist_dir, ".sync-complete")
     sync_progress_file = os.path.join(hist_dir, ".sync-progress.json")
@@ -218,6 +230,8 @@ def load_settings() -> Settings:
         hf_lfs_prefix=hf_lfs_prefix,
         enable_git_push=enable_git_push,
         enable_hf_push=enable_hf_push,
+        git_backend=git_backend,
+        git_hf_repo=git_hf_repo,
         sync_complete_file=sync_complete_file,
         sync_progress_file=sync_progress_file,
     )
