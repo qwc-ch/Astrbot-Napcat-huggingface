@@ -132,8 +132,9 @@ RUN mkdir -p /home/user/logs && chown -R 1000:1000 /home/user/logs
 COPY --chown=1000:1000 supervisor/supervisord.conf /home/user/supervisord.conf
 
 # 运行开关配置：config.env 经 /etc/profile.d 注入所有 bash -lc 子进程
+# set -a 确保变量被导出到子进程（否则 run-napcat.sh/daemon 读不到）
 COPY config.env /etc/astrbot-config.env
-RUN printf 'if [ -f /etc/astrbot-config.env ]; then\n  . /etc/astrbot-config.env\nfi\n' > /etc/profile.d/zz-astrbot-config.sh && chmod 644 /etc/profile.d/zz-astrbot-config.sh
+RUN printf 'set -a\n[ -f /etc/astrbot-config.env ] && . /etc/astrbot-config.env\nset +a\n' > /etc/profile.d/zz-astrbot-config.sh && chmod 644 /etc/profile.d/zz-astrbot-config.sh
 RUN mkdir -p /home/user/nginx && chown -R 1000:1000 /home/user/nginx
 COPY --chown=1000:1000 nginx/nginx.conf /home/user/nginx/nginx.conf
 COPY --chown=1000:1000 nginx/default_admin_config.json /home/user/nginx/default_admin_config.json
