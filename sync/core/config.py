@@ -71,6 +71,10 @@ DEFAULT_HF_REVISION = os.environ.get("HF_REVISION", "main")
 DEFAULT_HF_REPO_TYPE = os.environ.get("HF_REPO_TYPE", "model").strip().lower()  # model 或 dataset
 DEFAULT_HF_LFS_PREFIX = os.environ.get("HF_LFS_PREFIX", "lfs")  # 文件存放子目录
 
+# 运行开关（config.env 注入）
+DEFAULT_ENABLE_GIT_PUSH = os.environ.get("ENABLE_GIT_PUSH", "true").lower() == "true"
+DEFAULT_ENABLE_HF_PUSH = os.environ.get("ENABLE_HF_PUSH", "true").lower() == "true"
+
 
 @dataclass
 class Settings:
@@ -95,6 +99,9 @@ class Settings:
     hf_revision: str
     hf_repo_type: str
     hf_lfs_prefix: str
+    # 运行开关（config.env）
+    enable_git_push: bool
+    enable_hf_push: bool
     sync_complete_file: str  # 同步完成标记文件
     sync_progress_file: str  # 同步进度文件
 
@@ -181,6 +188,10 @@ def load_settings() -> Settings:
     hf_revision = DEFAULT_HF_REVISION
     hf_repo_type = DEFAULT_HF_REPO_TYPE if DEFAULT_HF_REPO_TYPE in ("model", "dataset") else "model"
     hf_lfs_prefix = DEFAULT_HF_LFS_PREFIX
+
+    # 运行开关（config.env）
+    enable_git_push = DEFAULT_ENABLE_GIT_PUSH
+    enable_hf_push = DEFAULT_ENABLE_HF_PUSH
     
     sync_complete_file = os.path.join(hist_dir, ".sync-complete")
     sync_progress_file = os.path.join(hist_dir, ".sync-progress.json")
@@ -205,6 +216,8 @@ def load_settings() -> Settings:
         hf_revision=hf_revision,
         hf_repo_type=hf_repo_type,
         hf_lfs_prefix=hf_lfs_prefix,
+        enable_git_push=enable_git_push,
+        enable_hf_push=enable_hf_push,
         sync_complete_file=sync_complete_file,
         sync_progress_file=sync_progress_file,
     )

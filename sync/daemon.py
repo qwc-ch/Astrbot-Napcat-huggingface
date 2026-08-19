@@ -116,9 +116,13 @@ class SyncDaemon:
             try:
                 # 远端是否为空？
                 if git_ops.remote_is_empty(self.st.hist_dir):
-                    log("远端为空：执行初始提交并推送")
                     git_ops.initial_commit_if_needed(self.st.hist_dir)
-                    git_ops.push(self.st.hist_dir, self.st.branch)
+                    if self.st.enable_git_push:
+                        log("远端为空：执行初始提交并推送")
+                        git_ops.push(self.st.hist_dir, self.st.branch)
+                    else:
+                        log("远端为空且 ENABLE_GIT_PUSH=false：仅本地提交，跳过推送")
+                        return
                 else:
                     git_ops.fetch_and_checkout(self.st.hist_dir, self.st.branch)
                 
@@ -166,7 +170,7 @@ class SyncDaemon:
             changed = git_ops.add_all_and_commit_if_needed(
                 self.st.hist_dir, "chore(sync): initial link & empty dirs"
             )
-            if changed:
+            if changed and self.st.enable_git_push:
                 try:
                     git_ops.push(self.st.hist_dir, self.st.branch)
                 except Exception as e:
@@ -341,7 +345,11 @@ class SyncDaemon:
                     err(f"Failed to restore LFS files after pull: {e}")
             
             # 3. 处理大文件（转换为 LFS）
-            self.process_large_files()
+            if self.st.enable_hf_push:
+                self.process_large_files()
+            elif not hasattr(self, "_hf_push_warned"):
+                log("ENABLE_HF_PUSH=false：跳过 LFS 大文件扫描与上传")
+                self._hf_push_warned = True
             
             # 3. 持续跟踪空目录，确保新建的空文件夹也能被同步
             track_empty_dirs(self.st.hist_dir, self.st.targets, self.st.excludes)
@@ -352,12 +360,16 @@ class SyncDaemon:
             )
             
             # 5. 若有变更或远端领先，尝试推送
-            try:
-                git_ops.run(["git", "push", "origin", self.st.branch], cwd=self.st.hist_dir, check=False)
+            if not self.st.enable_git_push:
                 if changed:
-                    log("已提交并推送变更")
-            except Exception as e:
-                err(f"推送失败：{e}")
+                    log("ENABLE_GIT_PUSH=false：仅本地提交，跳过推送")
+            else:
+                try:
+                    git_ops.run(["git", "push", "origin", self.st.branch], cwd=self.st.hist_dir, check=False)
+                    if changed:
+                        log("已提交并推送变更")
+                except Exception as e:
+                    err(f"推送失败：{e}")
         self._last_commit_ts = time.time()
 
     # -------- 主循环 --------
