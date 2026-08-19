@@ -3,7 +3,7 @@ FROM ubuntu:24.04
 # Default APT mirror tuned for GitHub Actions（北美）：azure.archive
 # 可按需覆盖：edge.kernel.org、mirror.rackspace.com 等
 # HF Space 构建环境对 azure.archive 连接不稳定，默认改用官方源
-ARG APT_MIRROR=http://archive.ubuntu.com/ubuntu
+ARG APT_MIRROR=http://mirror.netcologne.de/ubuntu
 ENV DEBIAN_FRONTEND=noninteractive \
     TZ=Etc/UTC
 
